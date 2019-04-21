@@ -1,11 +1,10 @@
 # php-csp-ruler
-Developed by Joe Fox
 
 This script allows monitoring of the content security header length, as some firewalls block HTTP responses where there are headers that exceed a certain length (from personal experience, I've seen 4096 used as the length that starts getting requests blocked).
 
 ## 1) Usage guide
 1) Copy the `tests/tests.php.template` to `tests/tests.php`.
-2) Run `./csp-ruler.
+2) Run `./csp-ruler`.
 
 ## 2) Planned improvements
 1) Send the output to a file at a specified path.
