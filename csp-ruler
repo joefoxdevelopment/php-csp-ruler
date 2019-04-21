@@ -5,16 +5,24 @@ namespace CspRuler;
 
 class Runner
 {
+    private $testMetrics = [
+        'failures'  => 0,
+        'reasons'   => [],
+        'successes' => 0,
+        'results'   => [],
+    ];
+
     private $tests;
     private $testsPath = 'tests/tests.php';
 
     public function run()
     {
         $this->loadTests();
-        $this->beginTests();
+        $this->doTests();
+        $this->outputMetrics();
     }
 
-    private function printLine(string $message)
+    private function printLine(string $message = '')
     {
         echo $message . PHP_EOL;
     }
@@ -35,16 +43,122 @@ class Runner
         }
     }
 
-    private function beginTests()
+    private function doTests()
     {
         foreach ($this->tests as $name => $url) {
-            $this->printLine(sprintf('Beginning test for test: %s, url: %s', $name, $url));
+            $this->doTest($name, $url);
+        }
+    }
 
-            if (false === filter_var($url, FILTER_VALIDATE_URL)) {
-                $this->printLine(sprintf('Unable to perform test %s. Invalid URL %s', $name, $url));
+    private function doTest(string $name, string $url)
+    {
+        $this->printLine(sprintf(
+            'Beginning test for test: %s, url: %s',
+            $name,
+            $url
+        ));
+
+        if (false === filter_var($url, FILTER_VALIDATE_URL)) {
+            $this->printLine(sprintf(
+                'Unable to perform test %s. Invalid URL %s',
+                $name,
+                $url
+            ));
+            $this->metrics['failures']++;
+            $this->metrics['reasons']['invalidUrl'] += 1;
+            return;
+        }
+
+        $curl     = $this->initCurl($url);
+        $response = curl_exec($curl);
+        curl_close($curl);
+
+        try {
+            $csp = $this->getCspFromResponse($response);
+        } catch (\Throwable $e) {
+            $this->testMetrics['failures']++;
+            $this->testMetrics['reasons'][$e->getMessage()] += 1;
+            $this->printLine(sprintf(
+                'Unable to complete test %s, reason %s',
+                $name,
+                $e->getMessage()
+            ));
+            return;
+        }
+
+        $this->printLine(sprintf(
+            'test %s csp length: %d (%d including key)',
+            $name,
+            strlen($csp),
+            strlen($csp) + 25
+        ));
+
+        $this->testMetrics['results'][$url] = strlen($csp);
+
+        $this->testMetrics['successes']++;
+    }
+
+    private function initCurl(string $url)
+    {
+        $curl = curl_init($url);
+
+        curl_setopt($curl, CURLOPT_FOLLOWLOCATION, 3);
+        curl_setopt($curl, CURLOPT_HEADER, 1);
+        curl_setopt($curl, CURLOPT_NOBODY, 1);
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+
+        return $curl;
+    }
+
+    private function getCspFromResponse(string $response): string
+    {
+        $headers = $this->convertHeadersToArray($response);
+
+        if (!array_key_exists('content-security-policy', $headers))
+        {
+            throw new \Exception('noCsp');
+        }
+
+        return $headers['content-security-policy'];
+    }
+
+    private function convertHeadersToArray(string $response): array
+    {
+        if (empty($response)) {
+            $this->printLine('Unable to get CSP from empty response');
+            throw new \Exception('emptyResponse');
+        }
+
+        $headerLines = explode("\n", $response);
+        $headers     = [];
+        foreach ($headerLines as $headerLine)
+        {
+            $line = explode(':', $headerLine);
+
+            if (2 !== count($line))
+            {
                 continue;
             }
+
+            $headers[strtolower($line[0])] = $line[1];
         }
+
+        return $headers;
+    }
+
+    private function outputMetrics()
+    {
+        $this->printLine();
+        $this->printLine('==========================');
+        $this->printLine('Results:');
+        $this->printLine(sprintf(
+            'Successful tests: %d',
+            $this->testMetrics['successess']
+        ));
+        $this->printLine(sprintf(
+            'Unsuccsessful tests: %d',
+            $this->testMetrics['failures']
+        ));
     }
 }
 
