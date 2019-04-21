@@ -11,6 +11,7 @@ class Runner
     public function run()
     {
         $this->loadTests();
+        $this->beginTests();
     }
 
     private function printLine(string $message)
@@ -27,6 +28,16 @@ class Runner
         }
 
         $this->tests = require_once($this->testsPath);
+
+        if (!is_array($this->tests) || emtpy($this->tests)) {
+            $this->printLine('Tests file does not contain an array.');
+            exit(1);
+        }
+    }
+
+    private function beginTests()
+    {
+
     }
 }
 
