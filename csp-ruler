@@ -29,7 +29,7 @@ class Runner
 
         $this->tests = require_once($this->testsPath);
 
-        if (!is_array($this->tests) || emtpy($this->tests)) {
+        if (!is_array($this->tests) || empty($this->tests)) {
             $this->printLine('Tests file does not contain an array.');
             exit(1);
         }
@@ -37,7 +37,14 @@ class Runner
 
     private function beginTests()
     {
+        foreach ($this->tests as $name => $url) {
+            $this->printLine(sprintf('Beginning test for test: %s, url: %s', $name, $url));
 
+            if (false === filter_var($url, FILTER_VALIDATE_URL)) {
+                $this->printLine(sprintf('Unable to perform test %s. Invalid URL %s', $name, $url));
+                continue;
+            }
+        }
     }
 }
 
